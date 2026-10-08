@@ -4,6 +4,10 @@ Analysis of geographic and operational similarities among 10 major U.S. airports
 ## Overview
 This independent project was completed for MAT 167 at UC Davis. It explores geographic relationships and operational similarities among 10 major U.S. airports using R and Classical Multidimensional Scaling (MDS).
 
+## Project Files
+- [Full Project Report](MAT167_Final_Project.pdf)
+- [R Markdown Analysis](Final%20project.rmd)
+
 ## Methods
 - Geographic distance calculations
 - Data standardization
