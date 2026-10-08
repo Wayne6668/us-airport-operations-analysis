@@ -1,0 +1,469 @@
+---
+title: "MAT 167 Project"
+author: "Jinwei Liu"
+date: "2026-07-26"
+output: pdf_document
+---
+
+# Classical Multidimensional Scaling of Major U.S. Airports: Geographic Reconstruction and Operational Similarity
+
+**MAT 167 Final Project**  
+**Option 26: Classical Multidimensional Scaling**
+
+```{r}
+
+# Experiment 1: Geographic reconstruction of U.S. airports
+
+airports <- data.frame(
+  code = c(
+    "BOS", "JFK", "ATL", "MIA", "ORD",
+    "DFW", "DEN", "LAX", "SFO", "SEA"
+  ),
+
+  airport = c(
+    "Boston Logan International Airport",
+    "John F. Kennedy International Airport",
+    "Hartsfield-Jackson Atlanta International Airport",
+    "Miami International Airport",
+    "Chicago O'Hare International Airport",
+    "Dallas/Fort Worth International Airport",
+    "Denver International Airport",
+    "Los Angeles International Airport",
+    "San Francisco International Airport",
+    "Seattle-Tacoma International Airport"
+  ),
+
+  latitude = c(
+    42.362944,
+    40.639928,
+    33.636700,
+    25.795361,
+    41.976940,
+    32.897233,
+    39.861667,
+    33.942496,
+    37.618806,
+    47.449889
+  ),
+
+  longitude = c(
+    -71.006389,
+    -73.778692,
+    -84.427864,
+    -80.290116,
+    -87.908150,
+    -97.037695,
+    -104.673167,
+    -118.408049,
+    -122.375417,
+    -122.311778
+  )
+)
+
+# Display the data
+print(airports)
+```
+
+
+```{r}
+# Convert to planar coordinates
+
+# Earth's approximate radius in kilometers
+earth_radius <- 6371
+
+# Convert degrees to radians
+lat_rad <- airports$latitude * pi / 180
+lon_rad <- airports$longitude * pi / 180
+
+# Use the average airport location as the center
+center_lat <- mean(lat_rad)
+center_lon <- mean(lon_rad)
+
+# Approximate planar coordinates in kilometers
+airports$x_km <- earth_radius *
+  cos(center_lat) *
+  (lon_rad - center_lon)
+
+airports$y_km <- earth_radius *
+  (lat_rad - center_lat)
+
+# Display the new coordinates
+print(airports[, c("code", "x_km", "y_km")])
+```
+
+```{r}
+# Draw a map showing the original airport location
+plot(
+  airports$x_km,
+  airports$y_km,
+  type = "n",
+  asp = 1,
+  xlim = range(airports$x_km) + c(-300, 300),
+  ylim = range(airports$y_km) + c(-250, 250),
+  xlab = "East-West Position (km)",
+  ylab = "North-South Position (km)",
+  main = "Original Geographic Configuration of 10 U.S. Airports")
+
+points(
+  airports$x_km,
+  airports$y_km,
+  pch = 19,
+  cex = 1.2
+)
+
+text(
+  airports$x_km,
+  airports$y_km,
+  labels = airports$code,
+  pos = 3,
+  cex = 0.9
+)
+```
+
+```{r}
+# Calculate the distance matrix
+
+# Create the coordinate matrix
+X_original <- as.matrix(
+  airports[, c("x_km", "y_km")]
+)
+
+rownames(X_original) <- airports$code
+
+# Compute pairwise Euclidean distances
+airport_dist <- dist(
+  X_original,
+  method = "euclidean"
+)
+
+# Convert the dist object into a full matrix
+D <- as.matrix(airport_dist)
+
+# Display the distance matrix
+round(D, 1)
+```
+
+```{r}
+round(D, 1)
+
+D["BOS", "JFK"]
+D["BOS", "SFO"]
+D["LAX", "SFO"]
+
+isSymmetric(D)
+diag(D)
+```
+
+```{r}
+# Square every entry in the distance matrix
+D_squared <- D^2
+
+round(D_squared, 0)
+```
+
+```{r}
+# Construct the centering matrix
+
+# Number of airports
+n <- nrow(D)
+
+# Centering matrix
+J <- diag(n) - matrix(1 / n, nrow = n, ncol = n)
+
+round(J, 2)
+```
+
+```{r}
+# Double centering
+
+# Recover the Gram matrix using double centering
+B <- -0.5 * J %*% D_squared %*% J
+
+rownames(B) <- airports$code
+colnames(B) <- airports$code
+
+round(B, 1)
+```
+
+```{r}
+# check
+isSymmetric(B)
+
+round(rowSums(B), 8)
+```
+
+```{r}
+# Gram matrix calculated directly from the original coordinates
+B_original <- X_original %*% t(X_original)
+
+# Compare the two Gram matrices
+max(abs(B - B_original))
+```
+
+```{r}
+# Eigendecomposition of the Gram matrix
+eig_B <- eigen(B, symmetric = TRUE)
+
+# Eigenvalues
+eig_values <- eig_B$values
+
+# Eigenvectors
+eig_vectors <- eig_B$vectors
+
+round(eig_values, 6)
+```
+
+```{r}
+# Keep the two largest eigenvalues
+lambda_2 <- diag(eig_values[1:2])
+
+# Keep the corresponding eigenvectors
+V_2 <- eig_vectors[, 1:2]
+
+# Reconstruct two-dimensional coordinates
+X_mds <- V_2 %*% sqrt(lambda_2)
+
+rownames(X_mds) <- airports$code
+colnames(X_mds) <- c("MDS1", "MDS2")
+
+round(X_mds, 2)
+```
+
+```{r}
+# Distances from the reconstructed coordinates
+D_mds <- as.matrix(dist(X_mds))
+
+# Maximum difference between original and reconstructed distances
+max(abs(D - D_mds))
+```
+
+```{r}
+# MDS plot
+plot(
+  X_mds[, 1],
+  X_mds[, 2],
+  type = "n",
+  asp = 1,
+  xlim = range(X_mds[, 1]) + c(-300, 300),
+  ylim = range(X_mds[, 2]) + c(-250, 250),
+  xlab = "MDS Dimension 1",
+  ylab = "MDS Dimension 2",
+  main = "Airport Locations Reconstructed by Classical MDS"
+)
+
+points(
+  X_mds[, 1],
+  X_mds[, 2],
+  pch = 19,
+  cex = 1.2
+)
+
+text(
+  X_mds[, 1],
+  X_mds[, 2],
+  labels = airports$code,
+  pos = 3,
+  cex = 0.9
+)
+```
+
+```{r}
+# eigenvalue plot
+plot(
+  1:length(eig_values),
+  eig_values,
+  type = "b",
+  pch = 19,
+  xlab = "Dimension",
+  ylab = "Eigenvalue",
+  main = "Eigenvalues of the Gram Matrix"
+)
+
+abline(h = 0, lty = 2)
+```
+
+```{r}
+# Calculate the proportion of each of the two dimensions
+
+# proportion of positive eigenvalues
+positive_values <- eig_values[eig_values > 1e-8]
+
+eig_proportion <- positive_values / sum(positive_values)
+
+round(eig_proportion, 4)
+round(sum(eig_proportion[1:2]), 4)
+```
+
+
+
+```{r}
+# Experiment 2: Analysis of Airport Operational Similarities
+
+# read data
+airport_ops <- read.csv("airport_operations_2024.csv")
+
+airport_ops
+```
+
+```{r}
+# Create a numerical matrix
+
+# numeric variables
+ops_data <- airport_ops[, c(
+  "passengers",
+  "departures",
+  "delay_rate",
+  "cancellation_rate"
+)]
+
+rownames(ops_data) <- airport_ops$code
+
+ops_data
+```
+
+```{r}
+# standardize
+ops_scaled <- scale(ops_data)
+
+round(ops_scaled, 2)
+```
+
+```{r}
+# Develop an operational differentiation matrix
+# check the standarize
+round(colMeans(ops_scaled), 10)
+
+round(apply(ops_scaled, 2, sd), 10)
+```
+
+```{r}
+# operational distance matrix
+D_ops <- as.matrix(dist(ops_scaled))
+
+round(D_ops, 2)
+```
+
+```{r}
+# Find the most similar and most different airport combinations
+
+# remove diagonal (because the min is itself = 0)
+D_check <- D_ops
+diag(D_check) <- NA
+
+# similar pair
+which(
+  D_check == min(D_check, na.rm = TRUE),
+  arr.ind = TRUE
+)
+
+min(D_check, na.rm = TRUE)
+
+# dissimilar pair
+which(
+  D_check == max(D_check, na.rm = TRUE),
+  arr.ind = TRUE
+)
+
+max(D_check, na.rm = TRUE)
+```
+
+```{r}
+# Perform MDS on operational distances
+
+# double centering
+n_ops <- nrow(D_ops)
+J_ops <- diag(n_ops) - matrix(1 / n_ops, n_ops, n_ops)
+
+B_ops <- -0.5 * J_ops %*% (D_ops^2) %*% J_ops
+
+# eigendecomposition
+eig_ops <- eigen(B_ops, symmetric = TRUE)
+
+ops_values <- eig_ops$values
+ops_vectors <- eig_ops$vectors
+
+round(ops_values, 6)
+```
+
+```{r}
+# Keep the first two dimensions
+
+# two dimensions
+V_ops2 <- ops_vectors[, 1:2]
+L_ops2 <- diag(ops_values[1:2])
+
+X_ops_mds <- V_ops2 %*% sqrt(L_ops2)
+
+rownames(X_ops_mds) <- airport_ops$code
+colnames(X_ops_mds) <- c("MDS1", "MDS2")
+
+round(X_ops_mds, 2)
+```
+
+```{r}
+# Examine how much information is retained by the first two dimensions
+
+# proportion
+positive_ops <- ops_values[ops_values > 1e-8]
+
+ops_prop <- positive_ops / sum(positive_ops)
+
+round(ops_prop, 4)
+round(sum(ops_prop[1:2]), 4)
+```
+
+```{r}
+# Plot the operational MDS diagram.
+plot(
+  X_ops_mds[, 1],
+  X_ops_mds[, 2],
+  type = "n",
+  asp = 1,
+  xlim = range(X_ops_mds[, 1]) + c(-0.5, 0.5),
+  ylim = range(X_ops_mds[, 2]) + c(-0.5, 0.5),
+  xlab = "MDS Dimension 1 (54.0%)",
+  ylab = "MDS Dimension 2 (36.3%)",
+  main = "Operational Similarity of 10 U.S. Airports"
+)
+
+points(X_ops_mds[, 1], X_ops_mds[, 2], pch = 19)
+
+label_pos <- c(
+  BOS = 1, JFK = 3, ATL = 3, MIA = 3, ORD = 2,
+  DFW = 3, DEN = 3, LAX = 3, SFO = 2, SEA = 1
+)
+
+text(
+  X_ops_mds[, 1],
+  X_ops_mds[, 2],
+  labels = rownames(X_ops_mds),
+  pos = label_pos[rownames(X_ops_mds)],
+  cex = 0.9
+)
+
+abline(h = 0, v = 0, lty = 2)
+```
+
+```{r}
+# dimension proportions
+barplot(
+  ops_prop,
+  names.arg = 1:length(ops_prop),
+  xlab = "MDS Dimension",
+  ylab = "Proportion",
+  main = "Information Retained by Each MDS Dimension"
+)
+
+abline(h = 0)
+```
+
+```{r}
+# correlations with MDS dimensions
+dim_cor <- cor(
+  ops_scaled,
+  X_ops_mds
+)
+
+round(dim_cor, 2)
+```
+
